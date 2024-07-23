@@ -1,0 +1,17 @@
+name: Terraform Automation Pipe
+image:
+description: This pipe is an example to show how easy is to create pipes for Bitbucket Pipelines.
+category: Deployment
+repository: 
+vendor:
+  name: 
+  website: 
+maintainer:
+  name: 
+  website: 
+tags:
+    - bitbucket-pipelines
+    - pipes
+    - bash
+    - aws
+  

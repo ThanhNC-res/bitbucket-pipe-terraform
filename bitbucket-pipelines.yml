@@ -1,0 +1,38 @@
+image:
+  name: atlassian/default-image:3
+
+pipelines:
+  branches:
+    master:
+    - step:
+        name: Build and Push
+        oidc: true
+        runs-on:
+          - runner.dev
+        script:
+        # Build and push image
+        - cat /etc/os-release
+        - curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" 
+        - unzip awscliv2.zip
+        - ./aws/install 
+        - aws --version
+        - export AWS_ROLE_ARN=arn:aws:iam::839435588010:role/YoPayment-AWS-Terraform-Pgw-Pln
+        - export AWS_WEB_IDENTITY_TOKEN_FILE=$(pwd)/web-identity-token
+        - echo $BITBUCKET_STEP_OIDC_TOKEN > $(pwd)/web-identity-token
+        - export $(printf "AWS_ACCESS_KEY_ID=%s AWS_SECRET_ACCESS_KEY=%s AWS_SESSION_TOKEN=%s" $(aws sts assume-role --region ${AWS_REGION} --role-arn arn:aws:iam::921063945948:role/YoPayment-AWS-Terraform-Pgw-Cnp --role-session-name Image-Pull --query "Credentials.[AccessKeyId,SecretAccessKey,SessionToken]" --output text))
+        - export
+        - aws ecr describe-repositories --repository-names ${BITBUCKET_REPO_SLUG} --region ${AWS_REGION} || aws ecr create-repository --repository-name ${BITBUCKET_REPO_SLUG} --region ${AWS_REGION}
+        - ACCOUNT_ID=$(aws sts get-caller-identity --output json | jq '.Account' | sed 's/\"//g')
+        - VERSION="1.$BITBUCKET_BUILD_NUMBER"
+        #- echo ${DOCKERHUB_PASSWORD} | docker login --username "$DOCKERHUB_USERNAME" --password-stdin
+        - aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
+        - IMAGE="${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/$BITBUCKET_REPO_SLUG"
+        - docker build -t ${IMAGE}:${VERSION} .
+        - docker tag ${IMAGE}:${VERSION} ${IMAGE}:latest
+        - docker push ${IMAGE}
+        # Push tags
+        - git tag -a "${VERSION}" -m "Tagging for release ${VERSION}"
+        - git push origin ${VERSION}
+        services:
+        - docker
+        
